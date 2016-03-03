@@ -36,6 +36,31 @@ defmodule BuildServer.Server do
     {:reply, do_get_configuration(system, state), state}
   end
 
+  def handle_call({:scheduler_deploy, system, schedule, options}, from, state) when %{} = state[system] do
+    case state[system] do
+      %{} ->
+        job = %Quantum.Job
+        {
+            schedule: schedule,
+            task:
+              fn -> invoke_client_deploy(
+                from, system, system |> get_configuration!(state), options)
+              end
+        }
+        Quantum.add_job("Deploy #{system} on #{inspect from}", job)
+        {:reply, :ok, state}
+      _ ->
+        {
+          :reply,
+          {
+            :failed,
+            "System #{system} does not exist. Valid values are: #{state |> get_systems_string}"
+          },
+          state
+        }
+    end
+  end
+
   # Helpers
   defp contains_value([], _v) do
     false
@@ -55,6 +80,26 @@ defmodule BuildServer.Server do
       %{} = c -> {:configuration, c}
       _ -> {:unknown_system, "System #{system} is unknown to the build server"}
     end
+  end
+
+  defp get_configuration!(system, state) do
+    case do_get_configuration(system, state) do
+      {:configuration, c} -> c
+      {:unknown_system, message} -> raise message
+      _ -> raise "Failed to retrieve configuration for the system #{system}"
+    end
+  end
+
+  defp invoke_client_deploy(client, system, configuration, options \\ []) do
+    GenServer.call(client, {:start_deploy, system, configuration, options})
+  end
+
+  defp get_systems(state) do
+    {k, _v} <- state, into: [], do: k
+  end
+
+  defp get_systems_string(state, delimiter \\ ", ") do
+    state |> get_systems |> Enum.join(delimiter)
   end
 
 end

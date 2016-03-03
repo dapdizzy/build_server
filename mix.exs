@@ -14,7 +14,7 @@ defmodule BuildServer.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger],
+    [applications: [:logger, :quantum],
      mod: {BuildServer, []}]
   end
 
@@ -28,6 +28,6 @@ defmodule BuildServer.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    []
+     [{:quantum, ">= 1.6.1"}]
   end
 end
