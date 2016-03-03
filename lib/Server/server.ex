@@ -36,7 +36,7 @@ defmodule BuildServer.Server do
     {:reply, do_get_configuration(system, state), state}
   end
 
-  def handle_call({:scheduler_deploy, system, schedule, options}, from, state) when %{} = state[system] do
+  def handle_call({:schedule_deploy, system, schedule, options}, from, state) do
     case state[system] do
       %{} ->
         job = %Quantum.Job
@@ -48,6 +48,7 @@ defmodule BuildServer.Server do
               end
         }
         Quantum.add_job("Deploy #{system} on #{inspect from}", job)
+        IO.puts "Scheduled deploy #{system} for #{inspect from} on #{schedule}"
         {:reply, :ok, state}
       _ ->
         {
@@ -95,7 +96,7 @@ defmodule BuildServer.Server do
   end
 
   defp get_systems(state) do
-    {k, _v} <- state, into: [], do: k
+    for {k, _v} <- state, into: [], do: k
   end
 
   defp get_systems_string(state, delimiter \\ ", ") do
