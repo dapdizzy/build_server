@@ -8,6 +8,9 @@ defmodule BuildServer.Server do
   end
 
   def init(%{} = configuration) do
+    IO.puts "Build server initializing..."
+    IO.puts "Submitting a job to run every minute"
+    Quantum.add_job("* * * * *", fn -> IO.puts "Ping" end)
     {:ok, configuration}
   end
 
@@ -36,19 +39,24 @@ defmodule BuildServer.Server do
     {:reply, do_get_configuration(system, state), state}
   end
 
-  def handle_call({:schedule_deploy, system, schedule, options}, from, state) do
+  def handle_call({:schedule_deploy, system, schedule, build_client, options}, _from, state) do
     case state[system] do
       %{} ->
-        job = %Quantum.Job
-        {
-            schedule: schedule,
-            task:
-              fn -> invoke_client_deploy(
-                from, system, system |> get_configuration!(state), options)
-              end
-        }
-        Quantum.add_job("Deploy #{system} on #{inspect from}", job)
-        IO.puts "Scheduled deploy #{system} for #{inspect from} on #{schedule}"
+        # job = %Quantum.Job
+        # {
+        #     schedule: schedule,
+        #     task:
+        #       fn -> invoke_client_deploy(
+        #         build_client, system, system |> get_configuration!(state), options)
+        #       end
+        # }
+        # Quantum.add_job("Deploy #{system} on #{inspect build_client}", job)
+        Quantum.add_job(
+          schedule,
+          fn -> invoke_client_deploy(
+            build_client, system, system |> get_configuration!(state), options)
+          end)
+        IO.puts "Scheduled invocation of deploy #{system} for #{inspect build_client} on #{schedule}"
         {:reply, :ok, state}
       _ ->
         {
@@ -92,6 +100,7 @@ defmodule BuildServer.Server do
   end
 
   defp invoke_client_deploy(client, system, configuration, options \\ []) do
+    IO.puts "Invoking client deploy for system: #{system} on client #{inspect client}"
     GenServer.call(client, {:start_deploy, system, configuration, options})
   end
 
