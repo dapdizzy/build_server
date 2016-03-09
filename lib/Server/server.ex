@@ -27,13 +27,13 @@ defmodule BuildServer.Server do
   end
 
   #Server callbacks
-  def handle_call(:list_systems, _from, systems) do
-    {:reply, systems, systems}
-  end
-
-  def handle_call({:has_system, system}, _from, systems) do
-    {:reply, contains_value(systems, system), systems}
-  end
+  # def handle_call(:list_systems, _from, systems) do
+  #   {:reply, systems, systems}
+  # end
+  #
+  # def handle_call({:has_system, system}, _from, systems) do
+  #   {:reply, contains_value(systems, system), systems}
+  # end
 
   def handle_call({:get_configuration, system}, _from, state) do
     {:reply, do_get_configuration(system, state), state}
@@ -68,6 +68,27 @@ defmodule BuildServer.Server do
           state
         }
     end
+  end
+
+  def handle_call(:list_systems, _from, state) do
+    {:reply, state |> get_systems, state}
+  end
+
+  def handle_call(:list_commands, _from, state) do
+    {:reply, list_commands, state}
+  end
+
+  def handle_call(:get_help, _from, state) do
+    {:reply, state |> get_help_string, state}
+  end
+
+  defp get_help_string(state) do
+  """
+  Valid commands are:
+  #{get_commands_string}
+  Valid systems are:
+  #{state |> get_systems_string}
+  """
   end
 
   # Helpers
@@ -110,6 +131,22 @@ defmodule BuildServer.Server do
 
   defp get_systems_string(state, delimiter \\ ", ") do
     state |> get_systems |> Enum.join(delimiter)
+  end
+
+  defp list_commands do
+    [
+      "deploy",
+      "schedule_deploy",
+      "h",
+      "help",
+      "get_configuration",
+      "list_commands",
+      "list_systems"
+    ]
+  end
+
+  defp get_commands_string do
+    for c <- list_commands, into: "", do: "#{c}\r\n"
   end
 
 end
