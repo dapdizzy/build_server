@@ -143,6 +143,12 @@ defmodule BuildServer.Server do
     end
   end
 
+  def handle_call({:build, system, build_client, options}, _from, %ServerState{build_configuration: build_configuration} = state) do
+    IO.puts "Starting build #{system} on #{inspect build_client} #{get_local_time_string}"
+    build_client |> invoke_client_build(system, system |> get_configuration!(build_configuration))
+    {:reply, :ok, state}
+  end
+
   defp get_help_string(configuration) do
   """
   Command format = command [system] [options]
@@ -213,6 +219,7 @@ defmodule BuildServer.Server do
       "list_commands",
       "list_systems",
       "schedule_build",
+      "build",
       "get_build_configuration",
       "get_build_info"
     ]
@@ -225,6 +232,15 @@ defmodule BuildServer.Server do
 
   defp get_drop_location(configuration, system) do
     configuration[system]["DropLocation"]
+  end
+
+  defp rjust(v, l \\ 2, c \\ ?0) do
+    v |> to_string |> String.rjust(l, c)
+  end
+
+  defp get_local_time_string do
+    {{year, month, day}, {hour, minute, second}} = :calendar.local_time
+    "#{year}.#{month}#{day} at #{hour |> rjust}:#{minute |> rjust}:#{second |> rjust}"
   end
 
 end
