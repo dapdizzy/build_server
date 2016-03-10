@@ -7,7 +7,10 @@ defmodule BuildServer do
     import Supervisor.Spec, warn: false
 
     children = [
-      worker(BuildServer.Server, [Application.get_env(:build_server, :configuration, %{})])
+      worker(
+        BuildServer.Server,
+        [Application.get_env(:build_server, :build_configuration, %{}),
+         Application.get_env(:build_server, :deploy_configuration, %{})])
       # Define workers and child supervisors to be supervised
       # worker(BuildServer.Worker, [arg1, arg2, arg3]),
     ]

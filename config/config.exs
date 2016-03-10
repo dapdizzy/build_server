@@ -28,8 +28,67 @@ use Mix.Config
 # here (which is why it is important to import them last).
 #
 #     import_config "#{Mix.env}.exs"
-config :build_server, systems: [Lips, Wax, Fax],
-configuration:
+config :build_server,
+scripts_dir: "C:/AX/BuildScripts",
+systems: [Lips, Wax, Fax],
+build_configuration:
+  %{
+    Fax:
+      %{
+        "VCSFilePath" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/FAX/Definition/VCSDef.xml",
+        "ApplicationSourceDir" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/FAX",
+        "DropLocation" => "C:/AX/Build/Drop/Fax",
+        "CompileAll" => "true",
+        "CleanupAfterBuild" => "true",
+        "CompileCIL" => "true",
+        "TFSIntegration" => "true",
+        "TFSUrl" => "https://mediamarkt.visualstudio.com/defaultcollection",
+        "TFSLabelPrefix" => "FAX-{0}",
+        "TFSWorkspace" => "$/FAX/FAX",
+        "LabelComments" => "FAX Build-{0}",
+        "MsBuildDir" => "C:/Program Files (x86)/MSBuild/12.0/Bin",
+        "NoCleanOnError" => "true",
+        "BackupModelStoreFolder" => "C:/AX/Backup/Modelstore",
+        "CleanBackupFileName" => "C:/Program Files/Microsoft SQL Server/MSSQL12.MSSQLSERVER/MSSQL/Backup/AXR3.bak"
+      },
+    Wax:
+      %{
+        "VCSFilePath" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/WAX/Definition/VCSDef.xml",
+        "ApplicationSourceDir" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/WAX",
+        "DropLocation" => "C:/AX/Build/Drop/Wax",
+        "CompileAll" => "true",
+        "CleanupAfterBuild" => "true",
+        "CompileCIL" => "true",
+        "TFSIntegration" => "true",
+        "TFSUrl" => "https://mediamarkt.visualstudio.com/defaultcollection",
+        "TFSLabelPrefix" => "WAX-{0}",
+        "TFSWorkspace" => "$/WAX/FAX",
+        "LabelComments" => "WAX Build-{0}",
+        "MsBuildDir" => "C:/Program Files (x86)/MSBuild/12.0/Bin",
+        "NoCleanOnError" => "true",
+        "BackupModelStoreFolder" => "C:/AX/Backup/Modelstore",
+        "CleanBackupFileName" => "C:/Program Files/Microsoft SQL Server/MSSQL12.MSSQLSERVER/MSSQL/Backup/AXR3.bak"
+      },
+    Lips:
+      %{
+        "VCSFilePath" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/LIPS/Definition/VCSDef.xml",
+        "ApplicationSourceDir" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/LIPS",
+        "DropLocation" => "C:/AX/Build/Drop/Lips",
+        "CompileAll" => "true",
+        "CleanupAfterBuild" => "true",
+        "CompileCIL" => "true",
+        "TFSIntegration" => "true",
+        "TFSUrl" => "https://mediamarkt.visualstudio.com/defaultcollection",
+        "TFSLabelPrefix" => "LIPS-{0}",
+        "TFSWorkspace" => "$/LIPS/LIPS",
+        "LabelComments" => "LIPS Build-{0}",
+        "MsBuildDir" => "C:/Program Files (x86)/MSBuild/12.0/Bin",
+        "NoCleanOnError" => "true",
+        "BackupModelStoreFolder" => "C:/AX/Backup/Modelstore",
+        "CleanBackupFileName" => "C:/Program Files/Microsoft SQL Server/MSSQL12.MSSQLSERVER/MSSQL/Backup/AXR3.bak"
+      }
+  },
+deploy_configuration:
   %{
     Lips:
       %{

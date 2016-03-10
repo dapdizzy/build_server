@@ -3,15 +3,22 @@ defmodule BuildServer.Server do
 
   # Client API
 
-  def start_link(configuration) do
-    GenServer.start_link(BuildServer.Server, configuration, name: BuildServer)
+  def start_link(build_configuration, deploy_configuration) do
+    GenServer.start_link(
+      BuildServer.Server,
+      %ServerState
+      {
+          build_configuration: build_configuration,
+          deploy_configuration: deploy_configuration
+      },
+      name: BuildServer)
   end
 
-  def init(%{} = configuration) do
+  def init(%ServerState{} = server_state) do
     IO.puts "Build server initializing..."
     IO.puts "Submitting a job to run every minute"
     Quantum.add_job("* * * * *", fn -> IO.puts "Ping" end)
-    {:ok, configuration}
+    {:ok, server_state}
   end
 
   def list_systems do
@@ -35,12 +42,12 @@ defmodule BuildServer.Server do
   #   {:reply, contains_value(systems, system), systems}
   # end
 
-  def handle_call({:get_configuration, system}, _from, state) do
-    {:reply, do_get_configuration(system, state), state}
+  def handle_call({:get_configuration, system}, _from, %ServerState{deploy_configuration: deploy_configuration} = state) do
+    {:reply, do_get_configuration(system, deploy_configuration), state}
   end
 
-  def handle_call({:schedule_deploy, system, schedule, build_client, options}, _from, state) do
-    case state[system] do
+  def handle_call({:schedule_deploy, system, schedule, build_client, options}, _from, %ServerState{deploy_configuration: deploy_configuration} = state) do
+    case deploy_configuration[system] do
       %{} ->
         # job = %Quantum.Job
         # {
@@ -54,7 +61,7 @@ defmodule BuildServer.Server do
         Quantum.add_job(
           schedule,
           fn -> invoke_client_deploy(
-            build_client, system, system |> get_configuration!(state), options)
+            build_client, system, system |> get_configuration!(deploy_configuration), options)
           end)
         IO.puts "Scheduled invocation of deploy #{system} for #{inspect build_client} on #{schedule}"
         {:reply, :ok, state}
@@ -63,31 +70,85 @@ defmodule BuildServer.Server do
           :reply,
           {
             :failed,
-            "System #{system} does not exist. Valid values are: #{state |> get_systems_string}"
+            "System #{system} does not exist. Valid values are: #{deploy_configuration |> get_systems_string}"
           },
           state
         }
     end
   end
 
-  def handle_call(:list_systems, _from, state) do
-    {:reply, state |> get_systems, state}
+  def handle_call({:schedule_build, system, schedule, build_client, options}, _from, %ServerState{build_configuration: build_configuration} = state) do
+    case build_configuration[system] do
+      %{} ->
+        # job = %Quantum.Job
+        # {
+        #     schedule: schedule,
+        #     task:
+        #       fn -> invoke_client_deploy(
+        #         build_client, system, system |> get_configuration!(state), options)
+        #       end
+        # }
+        # Quantum.add_job("Deploy #{system} on #{inspect build_client}", job)
+        Quantum.add_job(
+          schedule,
+          fn -> invoke_client_build(
+            build_client, system, system |> get_configuration!(build_configuration), options)
+          end)
+        IO.puts "Scheduled invocation of build #{system} for #{inspect build_client} on #{schedule}"
+        {:reply, :ok, state}
+      _ ->
+        {
+          :reply,
+          {
+            :failed,
+            "System #{system} does not exist. Valid values are: #{build_configuration |> get_systems_string}"
+          },
+          state
+        }
+    end
   end
 
-  def handle_call(:list_commands, _from, state) do
+  def handle_call(:list_systems, _from, %ServerState{deploy_configuration: deploy_configuration} = state) do
+    {:reply, deploy_configuration |> get_systems, state}
+  end
+
+  def handle_call(:list_commands, _from, %ServerState{} = state) do
     {:reply, list_commands, state}
   end
 
-  def handle_call(:get_help, _from, state) do
-    {:reply, state |> get_help_string, state}
+  def handle_call(:get_help, _from, %ServerState{deploy_configuration: deploy_configuration} = state) do
+    {:reply, deploy_configuration |> get_help_string, state}
   end
 
-  defp get_help_string(state) do
+  def handle_call({:get_build_info, system}, _from, %ServerState{build_configuration: build_configuration} = state) do
+    scripts_dir = Application.get_env(:build_server, :scripts_dir)
+    drop_location = build_configuration |> get_drop_location(system) |> String.replace("/", "\\")
+    scripts_dir |> File.cd!
+    IO.puts "Current directory: #{scripts_dir}"
+    build_info =
+    ~s/powershell .\\GetLatestBuild.ps1 "#{drop_location}"/
+    |> String.to_char_list
+    |> :os.cmd
+    |> List.to_string
+    IO.puts "PS Command result: #{build_info}"
+    case build_info |> String.split("\r\n") do
+      [latest_build, last_successful_build | _t] ->
+        {:reply, %{latest_build: latest_build, last_successful_build: last_successful_build}, state}
+      [latest_build|_t] ->
+        {:reply, %{latest_build: latest_build}, state}
+      [] ->
+        {:reply, %{}, state}
+      _ ->
+        {:reply, :no_info, state}
+    end
+  end
+
+  defp get_help_string(configuration) do
   """
-  Valid commands are:
-  #{get_commands_string}
-  Valid systems are:
-  #{state |> get_systems_string}
+  Command format = command [system] [options]
+  command = #{get_commands_string}
+  system = #{configuration |> get_systems_string}
+  options = #{get_options_string}
   """
   end
 
@@ -105,15 +166,15 @@ defmodule BuildServer.Server do
   end
 
   # Internal BL
-  defp do_get_configuration(system, state) do
-    case state[system] do
+  defp do_get_configuration(system, configuration) do
+    case configuration[system] do
       %{} = c -> {:configuration, c}
       _ -> {:unknown_system, "System #{system} is unknown to the build server"}
     end
   end
 
-  defp get_configuration!(system, state) do
-    case do_get_configuration(system, state) do
+  defp get_configuration!(system, configuration) do
+    case do_get_configuration(system, configuration) do
       {:configuration, c} -> c
       {:unknown_system, message} -> raise message
       _ -> raise "Failed to retrieve configuration for the system #{system}"
@@ -125,12 +186,21 @@ defmodule BuildServer.Server do
     GenServer.call(client, {:start_deploy, system, configuration, options})
   end
 
-  defp get_systems(state) do
-    for {k, _v} <- state, into: [], do: k
+  defp invoke_client_build(client, system, configuration, options \\ []) do
+    IO.puts "Invoking client build for system #{system} on client #{inspect client}"
+    GenServer.call(client, {:start_build, system, configuration, options})
   end
 
-  defp get_systems_string(state, delimiter \\ ", ") do
-    state |> get_systems |> Enum.join(delimiter)
+  defp get_systems(configuration) do
+    for {k, _v} <- configuration, into: [], do: k
+  end
+
+  defp get_systems_string(configuration, delimiter \\ " | ") do
+    configuration |> get_systems |> Enum.join(delimiter)
+  end
+
+  defp get_options_string do
+    "schedule time, i.e., hh:mm; etc. depending on command."
   end
 
   defp list_commands do
@@ -141,12 +211,20 @@ defmodule BuildServer.Server do
       "help",
       "get_configuration",
       "list_commands",
-      "list_systems"
+      "list_systems",
+      "schedule_build",
+      "get_build_configuration",
+      "get_build_info"
     ]
   end
 
   defp get_commands_string do
-    for c <- list_commands, into: "", do: "#{c}\r\n"
+    list_commands |> Enum.join(" | ")
+    #for c <- list_commands, into: "", do: "#{c}\r\n"
+  end
+
+  defp get_drop_location(configuration, system) do
+    configuration[system]["DropLocation"]
   end
 
 end
