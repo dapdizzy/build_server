@@ -149,6 +149,17 @@ defmodule BuildServer.Server do
     {:reply, :ok, state}
   end
 
+  def handle_call({:schedule_ping, schedule, client}, _from, state) do
+    Quantum.add_job(
+      schedule,
+      fn ->
+        IO.puts "Sending ping to #{inspect client} on #{get_local_time_string}"
+        r = client |> GenServer.call(:ping)
+        IO.puts "Result: #{r} came on #{get_local_time_string}"
+      end)
+    {:reply, :ok, state}
+  end
+
   defp get_help_string(configuration) do
   """
   Command format = command [system] [options]
@@ -221,7 +232,8 @@ defmodule BuildServer.Server do
       "schedule_build",
       "build",
       "get_build_configuration",
-      "get_build_info"
+      "get_build_info",
+      "schedule_ping"
     ]
   end
 

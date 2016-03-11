@@ -28,6 +28,9 @@ use Mix.Config
 # here (which is why it is important to import them last).
 #
 #     import_config "#{Mix.env}.exs"
+config :quantum,
+  timezone: :local
+
 config :build_server,
 scripts_dir: "C:/AX/BuildScripts",
 systems: [Lips, Wax, Fax],

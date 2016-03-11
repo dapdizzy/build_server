@@ -28,6 +28,6 @@ defmodule BuildServer.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-     [{:quantum, ">= 1.6.1"}]
+     [{:quantum, ">= 1.7.0"}]
   end
 end
