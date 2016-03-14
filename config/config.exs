@@ -32,6 +32,7 @@ config :quantum,
   timezone: :local
 
 config :build_server,
+home_dir: "C:/Users/pyatkov/build_server_w_localtime",
 scripts_dir: "C:/AX/BuildScripts",
 systems: [Lips, Wax, Fax],
 build_configuration:

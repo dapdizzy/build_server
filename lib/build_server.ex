@@ -9,8 +9,13 @@ defmodule BuildServer do
     children = [
       worker(
         BuildServer.Server,
-        [Application.get_env(:build_server, :build_configuration, %{}),
-         Application.get_env(:build_server, :deploy_configuration, %{})])
+        [
+          Application.get_env(:build_server, :build_configuration, %{}),
+           Application.get_env(:build_server, :deploy_configuration, %{}),
+           Application.get_env(:build_server, :home_dir, "")
+           |> Path.join("serverstate.txt")
+           |> BuildServer.Server.restore_dynamic_server_state
+         ])
       # Define workers and child supervisors to be supervised
       # worker(BuildServer.Worker, [arg1, arg2, arg3]),
     ]
