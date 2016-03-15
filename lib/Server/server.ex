@@ -23,6 +23,9 @@ defmodule BuildServer.Server do
     IO.puts "Submitting a job to run every minute"
     Quantum.add_job("* * * * *", fn -> IO.puts "Ping" end)
     IO.puts "Server dynamic state is #{inspect dynamic_state}"
+    IO.puts "Going to reschdule jobs from saved state"
+    IO.puts "Started Applications:\n#{inspect Application.started_applications}"
+    dynamic_state.quantum_schedule |> Enum.each(&rehydrate_job/1)
     {:ok, server_state}
   end
 
@@ -185,19 +188,45 @@ defmodule BuildServer.Server do
   def handle_call(
     {:schedule_ping, schedule, {_process, node} = _client},
     _from,
-    %ServerState{
+    %ServerState
+    {
       dynamic_state:
-        %DynamicState{quantum_schedule: quantum_schedule, clients: clients} = dynamic_state
-      } = state) do
-    myself = self()
+      %DynamicState
+      {
+        quantum_schedule: quantum_schedule,
+        clients: clients
+      } = dynamic_state
+    } = state) do
+    server_process = BuildServer
+    {m, f, a} = mfa = {__MODULE__, :ping_host, [node |> extract_host_name, server_process]}
+    Quantum.add_job(schedule, fn -> apply(m, f, a) end)
     job =
-    Quantum.add_job(
-      schedule,
-      fn ->
-        IO.puts "Sending ping to #{node} on #{get_local_time_string}"
-        r = myself |> GenServer.call({:my_client, node |> extract_host_name}) |> GenServer.call(:ping)
-        IO.puts "Result: #{r} came on #{get_local_time_string}"
-      end)
+    %Quantum.Job
+    {
+      schedule: schedule,
+      task:
+        {m, f},
+        # fn ->
+        #   apply(m, f, a)
+        # end,
+      args: a,
+      name: "pinger",
+      nodes: [node()]
+        # fn ->
+        #   IO.puts "Sending ping to #{node} on #{get_local_time_string}"
+        #   r = myself |> GenServer.call({:my_client, node |> extract_host_name}) |> GenServer.call(:ping)
+        #   IO.puts "Result: #{r} came on #{get_local_time_string}"
+        # end
+    }
+    # IO.puts "Going to schedule job:\n#{inspect job}"
+    # Quantum.add_job(job.name, job)
+    # Quantum.add_job(
+    #   schedule,
+    #   fn ->
+    #     IO.puts "Sending ping to #{node} on #{get_local_time_string}"
+    #     r = myself |> GenServer.call({:my_client, node |> extract_host_name}) |> GenServer.call(:ping)
+    #     IO.puts "Result: #{r} came on #{get_local_time_string}"
+    #   end)
     new_dynamic_state = %{dynamic_state | quantum_schedule: [job|quantum_schedule]}
     new_dynamic_state |> save_dynamic_server_state
     {:reply, :ok, %{state | dynamic_state: new_dynamic_state}}
@@ -326,6 +355,7 @@ defmodule BuildServer.Server do
       filepath |> File.exists? ->
         {state, _bindings} = filepath |> File.read! |> Code.eval_string
         state
+        # %{state | quantum_schedule: state.quantum_schedule |> Enum.map(&rehydrate_job/1)}
       true ->
         %DynamicState{}
     end
@@ -333,6 +363,28 @@ defmodule BuildServer.Server do
 
   defp extract_host_name(node) do
     node |> to_string |> String.split("@") |> List.last
+  end
+
+  def ping_host(host, server_pid) do
+    IO.puts "Sending ping to #{host} on #{get_local_time_string}"
+    r = server_pid |> GenServer.call({:my_client, host}) |> GenServer.call(:ping)
+    IO.puts "Result: #{r} came on #{get_local_time_string}"
+  end
+
+  defp rehydrate_job(%Quantum.Job{name: name, task: {m, f} = task, args: args, schedule: schedule} = job) do
+    
+    IO.puts "Rehydrating job #{name} calling #{inspect task} with args: #{inspect args}"
+    rehydrated_job = %Quantum.Job{task: fn -> apply(m, f, args) end, name: name, schedule: schedule}
+    IO.puts "Rehydrated job:\n#{inspect rehydrated_job}"
+    Quantum.add_job(schedule, fn -> apply(m, f, args) end)
+    # r = Quantum.add_job(name, rehydrated_job)
+    IO.puts "Job #{name} scheduled on #{schedule} for the call to #{inspect task}"
+    # IO.puts "Scheduler returned result: #{r}"
+    :ok
+  end
+
+  defp rehydrate_job(_) do
+    :nope
   end
 
 end
