@@ -11,9 +11,9 @@ defmodule BuildServer.Server do
       BuildServer.Server,
       %ServerState
       {
-          build_configuration: build_configuration,
-          deploy_configuration: deploy_configuration,
-          dynamic_state: dynamic_state
+        build_configuration: build_configuration,
+        deploy_configuration: deploy_configuration,
+        dynamic_state: dynamic_state
       },
       name: BuildServer)
   end
@@ -54,8 +54,20 @@ defmodule BuildServer.Server do
     {:reply, do_get_configuration(system, deploy_configuration), state}
   end
 
+  def handle_call({:get_configuration!, system}, _from, %ServerState{deploy_configuration: deploy_configuration} = state) do
+    {:reply, get_configuration!(system, deploy_configuration), state}
+  end
+
+  def handle_call({:get_build_configuration, system}, _from, %ServerState{build_configuration: build_configuration} = state) do
+    {:reply, do_get_build_configuration(system, build_configuration), state}
+  end
+
+  def handle_call({:get_build_configuration!, system}, _from, %ServerState{build_configuration: build_configuration} = state) do
+    {:reply, get_build_configuration!(system, build_configuration), state}
+  end
+
   def handle_call(
-    {:schedule_deploy, system, schedule, build_client, options},
+    {:schedule_deploy, system, schedule, {_process, client_node} = build_client, options},
     _from,
     %ServerState{
       deploy_configuration: deploy_configuration,
@@ -63,7 +75,7 @@ defmodule BuildServer.Server do
         %DynamicState
         {
           quantum_schedule: quantum_schedule,
-          clients: clients
+          clients: _clients
           } = dynamic_state} = state) do
     case deploy_configuration[system] do
       %{} ->
@@ -76,11 +88,22 @@ defmodule BuildServer.Server do
         #       end
         # }
         # Quantum.add_job("Deploy #{system} on #{inspect build_client}", job)
+        client_host = client_node |> extract_host_name
+        m = __MODULE__
+        f = :invoke_client_deploy
+        args = [client_host, system, options]
         job =
+        %Quantum.Job
+        {
+          task: {m, f},
+          args: args,
+          schedule: schedule
+        }
+        # Actual scheduling of the job goes here
         Quantum.add_job(
           schedule,
           fn -> invoke_client_deploy(
-            clients[build_client |> extract_host_name], system, system |> get_configuration!(deploy_configuration), options)
+            client_host, system, options)
           end)
         IO.puts "Scheduled invocation of deploy #{system} for #{inspect build_client} on #{schedule}"
         new_state = %{state | dynamic_state: %{dynamic_state | quantum_schedule: [job|quantum_schedule]}}
@@ -98,7 +121,7 @@ defmodule BuildServer.Server do
   end
 
   def handle_call(
-    {:schedule_build, system, schedule, build_client, options},
+    {:schedule_build, system, schedule, {_process, client_node} = build_client, options},
     _from,
     %ServerState{
       build_configuration: build_configuration,
@@ -106,7 +129,7 @@ defmodule BuildServer.Server do
         %DynamicState
         {
           quantum_schedule: quantum_schedule,
-          clients: clients
+          clients: _clients
         } = dynamic_state} = state) do
     case build_configuration[system] do
       %{} ->
@@ -119,11 +142,23 @@ defmodule BuildServer.Server do
         #       end
         # }
         # Quantum.add_job("Deploy #{system} on #{inspect build_client}", job)
+        client_host = client_node |> extract_host_name
+        args = [client_host, system, options]
+        m = __MODULE__
+        f = :invoke_client_build
         job =
+        %Quantum.Job
+        {
+          task: {m, f},
+          args: args,
+          schedule: schedule
+        }
+        # Actuall scheduling of the job is here
         Quantum.add_job(
           schedule,
           fn -> invoke_client_build(
-            clients[build_client |> extract_host_name], system, system |> get_configuration!(build_configuration), options)
+            client_host, system, options)
+            # clients[build_client |> extract_host_name], system, system |> get_configuration!(build_configuration), options)
           end)
         IO.puts "Scheduled invocation of build #{system} for #{inspect build_client} on #{schedule}"
         new_dynamic_state = %{dynamic_state | quantum_schedule: [job|quantum_schedule] }
@@ -194,11 +229,11 @@ defmodule BuildServer.Server do
       %DynamicState
       {
         quantum_schedule: quantum_schedule,
-        clients: clients
+        clients: _clients
       } = dynamic_state
     } = state) do
     server_process = BuildServer
-    {m, f, a} = mfa = {__MODULE__, :ping_host, [node |> extract_host_name, server_process]}
+    {m, f, a} = {__MODULE__, :ping_host, [node |> extract_host_name, server_process]}
     Quantum.add_job(schedule, fn -> apply(m, f, a) end)
     job =
     %Quantum.Job
@@ -246,7 +281,7 @@ defmodule BuildServer.Server do
     {:reply, :ok, %{state | dynamic_state: new_dynamic_state}}
   end
 
-  def handle_call({:my_client, host}, _from, %ServerState{dynamic_state: %DynamicState{clients: clients} = dynamic_state} = state) do
+  def handle_call({:my_client, host}, _from, %ServerState{dynamic_state: %DynamicState{clients: clients}} = state) do
     {:reply, clients[host], state}
   end
 
@@ -273,6 +308,21 @@ defmodule BuildServer.Server do
   end
 
   # Internal BL
+  defp do_get_build_configuration(system, configuration) do
+    case configuration[system] do
+      %{} = c -> {:configuration, c}
+      _ -> {:unknown_system, "System #{system} is unknwown to the build server"}
+    end
+  end
+
+  defp get_build_configuration!(system, configuration) do
+    case do_get_configuration(system, configuration) do
+      {:configuration, c} -> c
+      {:unknown_system, message} -> raise message
+      _ -> raise "Failed to retrieve build configuration for the system #{system}"
+    end
+  end
+
   defp do_get_configuration(system, configuration) do
     case configuration[system] do
       %{} = c -> {:configuration, c}
@@ -288,12 +338,24 @@ defmodule BuildServer.Server do
     end
   end
 
-  defp invoke_client_deploy(client, system, configuration, options \\ []) do
+  defp invoke_client_deploy(client_host, system, options \\ []) do
+    actual_client = BuildServer |> GenServer.call({:my_client, client_host})
+    configuration = BuildServer |> GenServer.call({:get_configuration!, system})
+    invoke_client_deploy(actual_client, system, configuration, options)
+  end
+
+  defp invoke_client_deploy(client, system, configuration, options) do
     IO.puts "Invoking client deploy for system: #{system} on client #{inspect client}"
     GenServer.call(client, {:start_deploy, system, configuration, options})
   end
 
-  defp invoke_client_build(client, system, configuration, options \\ []) do
+  defp invoke_client_build(client_host, system, options \\ []) do
+    actual_client = BuildServer |> GenServer.call({:my_client, client_host})
+    configuration = BuildServer |> GenServer.call({:get_build_configuration!, system})
+    invoke_client_build(actual_client, system, configuration, options)
+  end
+
+  defp invoke_client_build(client, system, configuration, options) do
     IO.puts "Invoking client build for system #{system} on client #{inspect client}"
     GenServer.call(client, {:start_build, system, configuration, options})
   end
@@ -371,8 +433,8 @@ defmodule BuildServer.Server do
     IO.puts "Result: #{r} came on #{get_local_time_string}"
   end
 
-  defp rehydrate_job(%Quantum.Job{name: name, task: {m, f} = task, args: args, schedule: schedule} = job) do
-    
+  defp rehydrate_job(%Quantum.Job{name: name, task: {m, f} = task, args: args, schedule: schedule}) do
+
     IO.puts "Rehydrating job #{name} calling #{inspect task} with args: #{inspect args}"
     rehydrated_job = %Quantum.Job{task: fn -> apply(m, f, args) end, name: name, schedule: schedule}
     IO.puts "Rehydrated job:\n#{inspect rehydrated_job}"
