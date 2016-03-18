@@ -3,3 +3,5 @@
 /deps
 erl_crash.dump
 *.ez
+/___serverstate.txt
+/serverstate - Copy.txt

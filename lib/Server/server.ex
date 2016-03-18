@@ -106,7 +106,9 @@ defmodule BuildServer.Server do
             client_host, system, options)
           end)
         IO.puts "Scheduled invocation of deploy #{system} for #{inspect build_client} on #{schedule}"
-        new_state = %{state | dynamic_state: %{dynamic_state | quantum_schedule: [job|quantum_schedule]}}
+        new_dynamic_state = %{dynamic_state | quantum_schedule: [job|quantum_schedule]}
+        new_dynamic_state |> save_dynamic_server_state
+        new_state = %{state | dynamic_state: new_dynamic_state}
         {:reply, :ok, new_state}
       _ ->
         {
