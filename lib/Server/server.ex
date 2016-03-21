@@ -67,16 +67,19 @@ defmodule BuildServer.Server do
   end
 
   def handle_call(
-    {:schedule_deploy, system, schedule, {_process, client_node} = build_client, options},
+    {:schedule_deploy = command, system, schedule, {_process, client_node} = build_client, options},
     _from,
-    %ServerState{
+    %ServerState
+    {
       deploy_configuration: deploy_configuration,
       dynamic_state:
         %DynamicState
         {
           quantum_schedule: quantum_schedule,
-          clients: _clients
-          } = dynamic_state} = state) do
+          clients: _clients,
+          client_schedule: %{} = client_schedule
+        } = dynamic_state
+    } = state) do
     case deploy_configuration[system] do
       %{} ->
         # job = %Quantum.Job
@@ -92,21 +95,25 @@ defmodule BuildServer.Server do
         m = __MODULE__
         f = :invoke_client_deploy
         args = [client_host, system, options]
-        job =
-        %Quantum.Job
-        {
-          task: {m, f},
-          args: args,
-          schedule: schedule
-        }
+        job = add_job(client_host, command, schedule, m, f, args)
+        # job =
+        # %Quantum.Job
+        # {
+        #   task: {m, f},
+        #   args: args,
+        #   schedule: schedule
+        # }
         # Actual scheduling of the job goes here
-        Quantum.add_job(
-          schedule,
-          fn -> invoke_client_deploy(
-            client_host, system, options)
-          end)
+        # Quantum.add_job(
+        #   schedule,
+        #   fn -> invoke_client_deploy(
+        #     client_host, system, options)
+        #   end)
         IO.puts "Scheduled invocation of deploy #{system} for #{inspect build_client} on #{schedule}"
-        new_dynamic_state = %{dynamic_state | quantum_schedule: [job|quantum_schedule]}
+        client_schedule_list = client_schedule |> Mao.get(client_host, [])
+        new_dynamic_state = %{dynamic_state |
+          quantum_schedule: [job|quantum_schedule],
+          client_schedule: client_schedule |> Nao.put(client_host, [%ScheduleEntry{command: command, schedule: schedule}])}
         new_dynamic_state |> save_dynamic_server_state
         new_state = %{state | dynamic_state: new_dynamic_state}
         {:reply, :ok, new_state}
@@ -123,7 +130,7 @@ defmodule BuildServer.Server do
   end
 
   def handle_call(
-    {:schedule_build, system, schedule, {_process, client_node} = build_client, options},
+    {:schedule_build = command, system, schedule, {_process, client_node} = build_client, options},
     _from,
     %ServerState{
       build_configuration: build_configuration,
@@ -131,7 +138,8 @@ defmodule BuildServer.Server do
         %DynamicState
         {
           quantum_schedule: quantum_schedule,
-          clients: _clients
+          clients: _clients,
+          client_schedule: client_schedule
         } = dynamic_state} = state) do
     case build_configuration[system] do
       %{} ->
@@ -148,22 +156,28 @@ defmodule BuildServer.Server do
         args = [client_host, system, options]
         m = __MODULE__
         f = :invoke_client_build
-        job =
-        %Quantum.Job
-        {
-          task: {m, f},
-          args: args,
-          schedule: schedule
-        }
-        # Actuall scheduling of the job is here
-        Quantum.add_job(
-          schedule,
-          fn -> invoke_client_build(
-            client_host, system, options)
-            # clients[build_client |> extract_host_name], system, system |> get_configuration!(build_configuration), options)
-          end)
+        job = add_job(client_host, command, schedule, m, f, args)
+        # job =
+        # %Quantum.Job
+        # {
+        #   task: {m, f},
+        #   args: args,
+        #   schedule: schedule
+        # }
+        # # Actuall scheduling of the job is here
+        # Quantum.add_job(
+        #   schedule,
+        #   fn -> invoke_client_build(
+        #     client_host, system, options)
+        #     # clients[build_client |> extract_host_name], system, system |> get_configuration!(build_configuration), options)
+        #   end)
         IO.puts "Scheduled invocation of build #{system} for #{inspect build_client} on #{schedule}"
-        new_dynamic_state = %{dynamic_state | quantum_schedule: [job|quantum_schedule] }
+        client_schedule_list = client_schedule |> Map.get(client_host, [])
+        new_dynamic_state = %{dynamic_state |
+          quantum_schedule: [job|quantum_schedule] ,
+          client_schedule: client_schedule |>
+            Map.put(client_host,
+              [%ScheduleEntry{command: command, schedule: schedule}|client_schedule_list])}
         new_dynamic_state |> save_dynamic_server_state
         {:reply, :ok, %{state | dynamic_state: new_dynamic_state}}
       _ ->
@@ -231,30 +245,33 @@ defmodule BuildServer.Server do
       %DynamicState
       {
         quantum_schedule: quantum_schedule,
-        clients: _clients
+        clients: _clients,
+        client_schedule: client_schedule
       } = dynamic_state
     } = state) do
     server_process = BuildServer
-    {m, f, a} = {__MODULE__, :ping_host, [node |> extract_host_name, server_process]}
-    Quantum.add_job(schedule, fn -> apply(m, f, a) end)
-    job =
-    %Quantum.Job
-    {
-      schedule: schedule,
-      task:
-        {m, f},
-        # fn ->
-        #   apply(m, f, a)
-        # end,
-      args: a,
-      name: "pinger",
-      nodes: [node()]
-        # fn ->
-        #   IO.puts "Sending ping to #{node} on #{get_local_time_string}"
-        #   r = myself |> GenServer.call({:my_client, node |> extract_host_name}) |> GenServer.call(:ping)
-        #   IO.puts "Result: #{r} came on #{get_local_time_string}"
-        # end
-    }
+    client_host_name = node |> extract_host_name |> String.upcase
+    {m, f, a} = {__MODULE__, :ping_host, [client_host_name, server_process]}
+    job = add_job(client_host_name, :schedule_ping, schedule, m, f, a)
+    # Quantum.add_job(schedule, fn -> apply(m, f, a) end)
+    # job =
+    # %Quantum.Job
+    # {
+    #   schedule: schedule,
+    #   task:
+    #     {m, f},
+    #     # fn ->
+    #     #   apply(m, f, a)
+    #     # end,
+    #   args: a,
+    #   name: "pinger",
+    #   nodes: [node()]
+    #     # fn ->
+    #     #   IO.puts "Sending ping to #{node} on #{get_local_time_string}"
+    #     #   r = myself |> GenServer.call({:my_client, node |> extract_host_name}) |> GenServer.call(:ping)
+    #     #   IO.puts "Result: #{r} came on #{get_local_time_string}"
+    #     # end
+    # }
     # IO.puts "Going to schedule job:\n#{inspect job}"
     # Quantum.add_job(job.name, job)
     # Quantum.add_job(
@@ -264,7 +281,18 @@ defmodule BuildServer.Server do
     #     r = myself |> GenServer.call({:my_client, node |> extract_host_name}) |> GenServer.call(:ping)
     #     IO.puts "Result: #{r} came on #{get_local_time_string}"
     #   end)
-    new_dynamic_state = %{dynamic_state | quantum_schedule: [job|quantum_schedule]}
+    host_schedule = client_schedule |> Map.get(client_host_name, [])
+    new_dynamic_state =
+      %{
+        dynamic_state |
+        quantum_schedule: [job|quantum_schedule],
+        client_schedule:
+          client_schedule |>
+          Map.put(
+            client_host_name,
+            [%ScheduleEntry{command: :schedule_ping, schedule: schedule}|host_schedule]
+            )
+      }
     new_dynamic_state |> save_dynamic_server_state
     {:reply, :ok, %{state | dynamic_state: new_dynamic_state}}
   end
@@ -285,6 +313,48 @@ defmodule BuildServer.Server do
 
   def handle_call({:my_client, host}, _from, %ServerState{dynamic_state: %DynamicState{clients: clients}} = state) do
     {:reply, clients[host], state}
+  end
+
+  def handle_call(
+    {:my_schedule, host},
+    _from,
+    %ServerState
+    {
+      dynamic_state: %DynamicState{client_schedule: %{} = client_schedule}
+    } = state) do
+    your_schedule = client_schedule[host]
+    your_schedule_list = for %ScheduleEntry{command: command, schedule: schedule} <- your_schedule, into: [], do: "Command #{command} scheduled on #{schedule}"
+    your_schedule_string = your_schedule_list |> Enum.join("\n")
+    {:reply, "Your schedule is:\n#{your_schedule_string}", state}
+  end
+
+  def handle_call(
+    {:remove_schedule, schedule, client_host},
+    _from,
+    %ServerState
+    {
+      dynamic_state:
+        %DynamicState
+        {
+          quantum_schedule: quantum_schedule,
+          client_schedule: %{} = client_schedule
+        } = dynamic_state
+    } = state) do
+    your_schedule = client_schedule |> Map.get(client_host, [])
+    {del, rem} = your_schedule |> Enum.partition(&(&1.schedule == schedule))
+    case del do
+      [] ->
+        {:reply, :nothing_is_scheduled, state}
+      [_h|_t] ->
+        # delete all the jobs by appropriate names from the Quantum scheduler
+        del |> Enum.each(&(delete_job(client_host, &1.command, &1.schedule)))
+        new_dynamic_state = %{dynamic_state |
+          quantum_schedule: quantum_schedule |> Enum.filter(&(&1.schedule != schedule or hd(&1.args) != client_host)),
+          client_schedule: client_schedule |> Map.put(client_host, rem)
+        }
+        new_dynamic_state |> save_dynamic_server_state
+        {:reply, {:ok, del}, %{state | dynamic_state: new_dynamic_state}}
+    end
   end
 
   defp get_help_string(configuration) do
@@ -388,7 +458,9 @@ defmodule BuildServer.Server do
       "get_build_configuration",
       "get_build_info",
       "schedule_ping",
-      "my_client"
+      "my_client",
+      "my_schedule",
+      "remove_schedule"
     ]
   end
 
@@ -435,20 +507,64 @@ defmodule BuildServer.Server do
     IO.puts "Result: #{r} came on #{get_local_time_string}"
   end
 
-  defp rehydrate_job(%Quantum.Job{name: name, task: {m, f} = task, args: args, schedule: schedule}) do
-
-    IO.puts "Rehydrating job #{name} calling #{inspect task} with args: #{inspect args}"
-    rehydrated_job = %Quantum.Job{task: fn -> apply(m, f, args) end, name: name, schedule: schedule}
-    IO.puts "Rehydrated job:\n#{inspect rehydrated_job}"
-    Quantum.add_job(schedule, fn -> apply(m, f, args) end)
+  defp rehydrate_job(%Quantum.Job{name: name, task: {_m, _f} = task, args: args, schedule: schedule} = job) do
+    IO.puts "Rehydrating job #{name} calling #{inspect task} with args: #{inspect args} on #{schedule}"
+    added_job = add_job(job)
+    IO.puts "Added restored job: #{inspect added_job}"
+    #rehydrated_job = %Quantum.Job{task: fn -> apply(m, f, args) end, name: name, schedule: schedule}
+    #IO.puts "Rehydrated job:\n#{inspect rehydrated_job}"
+    #Quantum.add_job(schedule, fn -> apply(m, f, args) end)
     # r = Quantum.add_job(name, rehydrated_job)
-    IO.puts "Job #{name} scheduled on #{schedule} for the call to #{inspect task}"
+    # IO.puts "Job #{name} scheduled on #{schedule} for the call to #{inspect task}"
     # IO.puts "Scheduler returned result: #{r}"
     :ok
   end
 
   defp rehydrate_job(_) do
     :nope
+  end
+
+  defp build_job_name(client_host, command, schedule) do
+    "#{command |> to_string |> String.downcase} on #{client_host |> String.upcase} at #{schedule}"
+  end
+
+  defp add_job(client_host, command, schedule, module, function, args) do
+    job = %Quantum.Job
+    {
+      name: build_job_name(client_host, command, schedule),
+      task: {module, function},
+      args: args,
+      schedule: schedule
+    }
+    add_job(job)
+  end
+
+  defp add_job(%Quantum.Job{name: name, schedule: schedule, task: task, args: args}) do
+    new_job = %Quantum.Job
+    {
+      name: name,
+      task: task,
+      args: args,
+      schedule: schedule
+    }
+    case Quantum.add_job(new_job.name, new_job) do
+      :ok -> :ok
+      _ -> raise "Could not add a scheduled job: #{new_job.name}"
+    end
+    # Find the job in the list to refresh the updated fields if any
+    added_job = case Quantum.find_job(new_job.name) do
+      %{} = j -> j
+      _ -> raise "Could not find recently added job #{new_job.name}"
+    end
+    added_job
+  end
+
+  defp delete_job(client_host, command, schedule) do
+    job_name = build_job_name(client_host, command, schedule)
+    case Quantum.delete_job(job_name) do
+      %Quantum.Job{name: name} -> :ok
+      _ -> raise "Could not delete job #{job_name}"
+    end
   end
 
 end
