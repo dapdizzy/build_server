@@ -123,17 +123,17 @@ deploy_configuration:
         "SystemName" => "FAX"
         },
       Wax:
-      %{
-        "BuildLocation" => "//MOW04DEV014/Drop/Wax",
-        "MsBuildDir" => "C:/Program Files/(x86)/MSBuild/12.0/Bin",
-        "CompileAll" => true,
-        "CompileCil" => true,
-        "UninstallOnly" => false,
-        "TFSIntegration" => true,
-        "TFSURL" => "https://mediamarkt.visualstudio.com/defaultcollection",
-        "TFSWorkspace" => "$WAX/WAX",
-        "NoCleanOnError" => true,
-        "InstallModelStore" => true,
-        "SystemName" => "WAX"
-        }
+        %{
+          "BuildLocation" => "//MOW04DEV014/Drop/Wax",
+          "MsBuildDir" => "C:/Program Files/(x86)/MSBuild/12.0/Bin",
+          "CompileAll" => true,
+          "CompileCil" => true,
+          "UninstallOnly" => false,
+          "TFSIntegration" => true,
+          "TFSURL" => "https://mediamarkt.visualstudio.com/defaultcollection",
+          "TFSWorkspace" => "$WAX/WAX",
+          "NoCleanOnError" => true,
+          "InstallModelStore" => true,
+          "SystemName" => "WAX"
+          }
     }

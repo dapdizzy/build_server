@@ -322,7 +322,7 @@ defmodule BuildServer.Server do
     {
       dynamic_state: %DynamicState{client_schedule: %{} = client_schedule}
     } = state) do
-    your_schedule = client_schedule[host]
+    your_schedule = client_schedule |> Map.get(host, [])
     your_schedule_list = for %ScheduleEntry{command: command, schedule: schedule} <- your_schedule, into: [], do: "Command #{command} scheduled on #{schedule}"
     your_schedule_string = your_schedule_list |> Enum.join("\n")
     {:reply, "Your schedule is:\n#{your_schedule_string}", state}
@@ -410,24 +410,24 @@ defmodule BuildServer.Server do
     end
   end
 
-  defp invoke_client_deploy(client_host, system, options \\ []) do
+  def invoke_client_deploy(client_host, system, options \\ []) do
     actual_client = BuildServer |> GenServer.call({:my_client, client_host})
     configuration = BuildServer |> GenServer.call({:get_configuration!, system})
     invoke_client_deploy(actual_client, system, configuration, options)
   end
 
-  defp invoke_client_deploy(client, system, configuration, options) do
+  def invoke_client_deploy(client, system, configuration, options) do
     IO.puts "Invoking client deploy for system: #{system} on client #{inspect client}"
     GenServer.call(client, {:start_deploy, system, configuration, options})
   end
 
-  defp invoke_client_build(client_host, system, options \\ []) do
+  def invoke_client_build(client_host, system, options \\ []) do
     actual_client = BuildServer |> GenServer.call({:my_client, client_host})
     configuration = BuildServer |> GenServer.call({:get_build_configuration!, system})
     invoke_client_build(actual_client, system, configuration, options)
   end
 
-  defp invoke_client_build(client, system, configuration, options) do
+  def invoke_client_build(client, system, configuration, options) do
     IO.puts "Invoking client build for system #{system} on client #{inspect client}"
     GenServer.call(client, {:start_build, system, configuration, options})
   end
@@ -545,7 +545,8 @@ defmodule BuildServer.Server do
       name: name,
       task: task,
       args: args,
-      schedule: schedule
+      schedule: schedule,
+      nodes: [node()]
     }
     case Quantum.add_job(new_job.name, new_job) do
       :ok -> :ok
