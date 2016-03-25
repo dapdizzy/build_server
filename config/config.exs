@@ -136,4 +136,23 @@ deploy_configuration:
           "InstallModelStore" => true,
           "SystemName" => "WAX"
           }
-    }
+    },
+    commands:
+      %{
+        "deploy" => "Format: deploy system_name.\nStarts deploy process right away.",
+        "schedule_deploy" => "Format: schedule_deploy system_name schedule.\nSchedules deploy processes at the specified schedule.",
+        "h" => "Short for 'help'.\nFormat: h [command].\nDisplays general help or help for a given command.",
+        "help" => "Format: help [coommand].\nDisplays general help or helr for a given command.",
+        "get_configuration" => "Format: get_configuration system.\nDisplays deployment configuration parameters for a given system.",
+        "list_commands" => "Lists commands available.",
+        "list_systems" => "Lists valid systems.",
+        "schedule_build" => "Format: schedule_build system_name schedule\nSchedules build of the system at a given schedule.",
+        "build" => "Format: build system.\nStarts build process of the given system right away.",
+        "get_build_configuration" => "Format: get_build_configuration system_name\nDisplays build configuration parameters for a given system.",
+        "get_build_info" => "Format: get_build_info system_name\nQueries build information, such as latest build and last successful build number for a given system_name.",
+        "schedule_ping" => "Format: schedule_ping schedule.\nSchedules a 'ping' to the current build client console.",
+        "my_client" => "Displays build client console active client information. For AX Build Administrator.",
+        "my_schedule" => "Displays schedules defined for the current host.",
+        "remove_schedule" => "Format: remove_schedule schedule\nRemoves all schedules at the given time for the current host.",
+        "clear_schedule" => "Clears, i.e., removes all the schedules defined for the current host."
+      }

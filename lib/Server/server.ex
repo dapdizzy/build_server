@@ -204,6 +204,10 @@ defmodule BuildServer.Server do
     {:reply, deploy_configuration |> get_help_string, state}
   end
 
+  def handle_call({:get_help, command}, _from, state) do
+    {:reply, get_command_help(command), state}
+  end
+
   def handle_call(
     {:get_build_info, system},
     _from,
@@ -357,6 +361,30 @@ defmodule BuildServer.Server do
     end
   end
 
+  def handle_call(
+    {:clear_schedule, client_host},
+    _from,
+    %ServerState
+    {
+      dynamic_state:
+        %DynamicState
+        {
+          quantum_schedule: quantum_schedule,
+          client_schedule: %{} = client_schedule
+        } = dynamic_state
+    } = state)
+    do
+    your_schedule = client_schedule |> Map.get(client_host, [])
+    for %ScheduleEntry{command: command, schedule: schedule} <- your_schedule do
+      :ok = delete_job(client_host, command, schedule)
+    end
+    new_dynamic_state = %{dynamic_state |
+      quantum_schedule: quantum_schedule |> Map.filter(&(&1.args |> hd != client_host)),
+      client_schedule: client_schedule |> Map.put(client_host, [])}
+    new_dynamic_state |> save_dynamic_server_state
+    {:reply, :ok, %{state | dynamic_state: new_dynamic_state}}
+  end
+
   defp get_help_string(configuration) do
   """
   Command format = command [system] [options]
@@ -445,23 +473,32 @@ defmodule BuildServer.Server do
   end
 
   defp list_commands do
-    [
-      "deploy",
-      "schedule_deploy",
-      "h",
-      "help",
-      "get_configuration",
-      "list_commands",
-      "list_systems",
-      "schedule_build",
-      "build",
-      "get_build_configuration",
-      "get_build_info",
-      "schedule_ping",
-      "my_client",
-      "my_schedule",
-      "remove_schedule"
-    ]
+    for {k, _v} <- Application.get_env(:build_server, :commands, %{}), into: [], do: k
+    # [
+    #   "deploy",
+    #   "schedule_deploy",
+    #   "h",
+    #   "help",
+    #   "get_configuration",
+    #   "list_commands",
+    #   "list_systems",
+    #   "schedule_build",
+    #   "build",
+    #   "get_build_configuration",
+    #   "get_build_info",
+    #   "schedule_ping",
+    #   "my_client",
+    #   "my_schedule",
+    #   "remove_schedule",
+    #   "clear_schedule"
+    # ]
+  end
+
+  defp get_command_help(command) do
+    case Application.get_env(:build_server, :commands, %{})[command] do
+      nil -> "Command #{command} is invalid."
+      help_text -> help_text
+    end
   end
 
   defp get_commands_string do
