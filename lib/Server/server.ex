@@ -379,7 +379,7 @@ defmodule BuildServer.Server do
       :ok = delete_job(client_host, command, schedule)
     end
     new_dynamic_state = %{dynamic_state |
-      quantum_schedule: quantum_schedule |> Map.filter(&(&1.args |> hd != client_host)),
+      quantum_schedule: quantum_schedule |> Enum.filter(&(&1.args |> hd != client_host)),
       client_schedule: client_schedule |> Map.put(client_host, [])}
     new_dynamic_state |> save_dynamic_server_state
     {:reply, :ok, %{state | dynamic_state: new_dynamic_state}}
