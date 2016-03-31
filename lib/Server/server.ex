@@ -234,9 +234,19 @@ defmodule BuildServer.Server do
     end
   end
 
-  def handle_call({:build, system, build_client, _options}, _from, %ServerState{build_configuration: build_configuration} = state) do
-    IO.puts "Starting build #{system} on #{inspect build_client} #{get_local_time_string}"
-    build_client |> invoke_client_build(system, system |> get_configuration!(build_configuration))
+  def handle_call({:build, system, {_process, client_node} = build_client, options}, _from,
+    %ServerState
+    {
+      dynamic_state:
+        %DynamicState
+        {
+          clients: clients
+        },
+      build_configuration: build_configuration
+    } = state) do
+    IO.puts "Starting build #{system} for #{inspect build_client} #{get_local_time_string}"
+    clients[client_node |> extract_host_name |> String.upcase] |>
+    invoke_client_build(system, system |> get_build_configuration!(build_configuration), options)
     {:reply, :ok, state}
   end
 
