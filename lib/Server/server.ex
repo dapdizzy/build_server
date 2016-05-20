@@ -209,29 +209,12 @@ defmodule BuildServer.Server do
   end
 
   def handle_call(
-    {:get_build_info, system},
+    {:get_build_info, system, client_node},
     _from,
     %ServerState{build_configuration: build_configuration} = state) do
-    scripts_dir = Application.get_env(:build_server, :scripts_dir)
-    drop_location = build_configuration |> get_drop_location(system) |> String.replace("/", "\\")
-    scripts_dir |> File.cd!
-    IO.puts "Current directory: #{scripts_dir}"
-    build_info =
-    ~s/powershell .\\GetLatestBuild.ps1 "#{drop_location}"/
-    |> String.to_char_list
-    |> :os.cmd
-    |> List.to_string
-    IO.puts "PS Command result: #{build_info}"
-    case build_info |> String.split("\r\n") do
-      [latest_build, last_successful_build | _t] ->
-        {:reply, %{latest_build: latest_build, last_successful_build: last_successful_build}, state}
-      [latest_build|_t] ->
-        {:reply, %{latest_build: latest_build}, state}
-      [] ->
-        {:reply, %{}, state}
-      _ ->
-        {:reply, :no_info, state}
-    end
+    # Do all the job in a dedicated process and return right away
+    spawn_link __MODULE__, :get_build_info!, [build_configuration, system, client_node]
+    {:reply, :ok, state}
   end
 
   def handle_call({:build, system, {_process, client_node} = build_client, options}, _from,
@@ -448,6 +431,32 @@ defmodule BuildServer.Server do
     end
   end
 
+  def get_build_info!(build_configuration, system, client_node) do
+    scripts_dir = Application.get_env(:build_server, :scripts_dir)
+    drop_location = build_configuration |> get_drop_location(system) |> String.replace("/", "\\")
+    scripts_dir |> File.cd!
+    IO.puts "Current directory: #{scripts_dir}"
+    build_info =
+    ~s/powershell .\\GetLatestBuild.ps1 "#{drop_location}"/
+    |> String.to_char_list
+    |> :os.cmd
+    |> List.to_string
+    IO.puts "PS Command result: #{build_info}"
+    build_info_result =
+    case build_info |> String.split("\r\n") do
+      [latest_build, last_successful_build | _t] ->
+        %{latest_build: latest_build, last_successful_build: last_successful_build}
+      [latest_build|_t] ->
+        %{latest_build: latest_build}
+      [] ->
+        %{}
+      _ ->
+        :no_info
+    end
+    BuildServer |> GenServer.call({:my_client, client_node |> extract_host_name})
+    |> notify_client_build_info(build_info_result)
+  end
+
   def invoke_client_deploy(client_host, system, options \\ []) do
     actual_client = BuildServer |> GenServer.call({:my_client, client_host})
     configuration = BuildServer |> GenServer.call({:get_configuration!, system})
@@ -468,6 +477,11 @@ defmodule BuildServer.Server do
   def invoke_client_build(client, system, configuration, options) do
     IO.puts "Invoking client build for system #{system} on client #{inspect client}"
     GenServer.call(client, {:start_build, system, configuration, options})
+  end
+
+  defp notify_client_build_info(client, build_info) do
+    IO.puts "Going to notify client #{inspect client}"
+    client |> GenServer.call({:build_info, build_info})
   end
 
   defp get_systems(configuration) do
