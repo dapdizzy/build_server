@@ -15,7 +15,14 @@ defmodule BuildServer do
            Application.get_env(:build_server, :home_dir, "")
            |> Path.join("serverstate.txt")
            |> BuildServer.Server.restore_dynamic_server_state
-         ])
+         ]),
+      worker(
+        MyLogger,
+        [
+          Application.get_env(:build_server, :home_dir, "")
+          |> Path.join("serverlog.txt")
+        ]
+      )
       # Define workers and child supervisors to be supervised
       # worker(BuildServer.Worker, [arg1, arg2, arg3]),
     ]

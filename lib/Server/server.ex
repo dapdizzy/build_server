@@ -217,6 +217,16 @@ defmodule BuildServer.Server do
     {:reply, :ok, state}
   end
 
+  def handle_call(
+    {:get_build_info, system, client_configuration, client_node},
+    _from,
+    %ServerState{build_configuration: build_configuration} = state
+  ) do
+    # Merge client_configuration into the server one and do all the job in a separate linked process
+    spawn_link __MODULE__, :get_build_info!, [build_configuration |> Map.merge(client_configuration), client_node]
+    {:ok, state}
+  end
+
   def handle_call({:build, system, {_process, client_node} = build_client, options}, _from,
     %ServerState
     {
@@ -228,8 +238,12 @@ defmodule BuildServer.Server do
       build_configuration: build_configuration
     } = state) do
     IO.puts "Starting build #{system} for #{inspect build_client} #{get_local_time_string}"
-    clients[client_node |> extract_host_name |> String.upcase] |>
-    invoke_client_build(system, system |> get_build_configuration!(build_configuration), options)
+    spawn(fn ->
+      clients[client_node |> extract_host_name |> String.upcase] |>
+      invoke_client_build(system, system |> get_build_configuration!(build_configuration), options)
+    end)
+    # client_node |> extract_host_name |> #String.upcase |>
+    # invoke_client_build(system, options)
     {:reply, :ok, state}
   end
 
@@ -303,6 +317,7 @@ defmodule BuildServer.Server do
     } = state) do
     host = node |> to_string |> String.split("@") |> List.last
     new_clients = clients |> Map.put(host, client)
+    IO.puts "Updated client for host #{host} to #{inspect client}"
     new_dynamic_state = %{dynamic_state | clients: new_clients}
     new_dynamic_state |> save_dynamic_server_state
     {:reply, :ok, %{state | dynamic_state: new_dynamic_state}}
@@ -457,6 +472,55 @@ defmodule BuildServer.Server do
     |> notify_client_build_info(build_info_result)
   end
 
+  # def get_latest_build_number(drop_root) do
+  #   scripts_dir = Application.get_env(:build_server, :scripts_dir)
+  #   scripts_dir |> File.cd!
+  #   x = ~s/powershell .\\GetLatestBuild.ps1 "#{drop_location}"/
+  #     |> String.to_char_list
+  #     |> :os.cmd
+  #     |> List.to_string
+  #     |> String.split("\r\n")
+  #   case x do
+  #     [latest_build|_h] -> latest_build
+  #     _ -> :nothing
+  #   end
+  # end
+
+  # def get_build_compile_log(build_configuration, system, client_node, build_number \\ :latest) do
+  #   scripts_dir = Application.get_env(:build_server, :scripts_dir)
+  #   drop_location = build_configuration |> get_drop_location(system) |> String.replace("/", "\\")
+  #   with valid_build_number where valid_build_number |> is_binary <-
+  #   case build_number do
+  #     :latest_build ->
+  #       drop_location |> get_latest_build_number
+  #       # Check for the latest build and ahead with to_char_list
+  #     s where s |> is_binary ->
+  #       cond drop_location |> Path.join(build_number) |> File.exists? do
+  #         true -> build_number
+  #         false -> :nothing
+  #       end
+  #   end,
+  #   compile_log <- valid_build_number |> Path.join(["Logs", "AxCompileAll.html"]),
+  #   true <- compile_log \> File.exists?
+  #   do
+  #     # transfer compile_log to client host and open it with ie.exe....
+  #   else
+  #     :nothing ->
+  #       case build_number do
+  #         :latest -> "Latest build not found"
+  #         s where s |> is_binary -> "Build #{build_number} is invalid"
+  #       end
+  #   end
+  #   scripts_dir |> File.cd!
+  #   IO.puts "Current directory: #{scripts_dir}"
+  #   call_result =
+  #   ~s/powershell .\\GetLatestBuild.ps1 "#{drop_location}"/
+  #   |> String.to_char_list
+  #   |> :os.cmd
+  #   |> List.to_string
+  #   IO.puts "PS Command result: #{call_result}"
+  # end
+
   def invoke_client_deploy(client_host, system, options \\ []) do
     actual_client = BuildServer |> GenServer.call({:my_client, client_host})
     configuration = BuildServer |> GenServer.call({:get_configuration!, system})
@@ -469,13 +533,16 @@ defmodule BuildServer.Server do
   end
 
   def invoke_client_build(client_host, system, options \\ []) do
-    actual_client = BuildServer |> GenServer.call({:my_client, client_host})
+    target_host = if options |> use_local_client?, do: node |> extract_host_name, else: client_host
+    actual_client = BuildServer |> GenServer.call({:my_client, target_host})
     configuration = BuildServer |> GenServer.call({:get_build_configuration!, system})
     invoke_client_build(actual_client, system, configuration, options)
   end
 
   def invoke_client_build(client, system, configuration, options) do
-    IO.puts "Invoking client build for system #{system} on client #{inspect client}"
+    message = "Invoking client build for system #{system} on client #{inspect client}"
+    MyLogger.log(message)
+    IO.puts message
     GenServer.call(client, {:start_build, system, configuration, options})
   end
 
@@ -627,6 +694,10 @@ defmodule BuildServer.Server do
       %Quantum.Job{name: name} -> :ok
       _ -> raise "Could not delete job #{job_name}"
     end
+  end
+
+  defp use_local_client?(options) do
+    options |> Enum.member?("remote")
   end
 
 end

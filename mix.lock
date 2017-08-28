@@ -1,1 +1,2 @@
-%{"quantum": {:hex, :quantum, "1.7.0"}}
+%{"my_logger": {:git, "https://github.com/dapdizzy/my_logger.git", "9c691cc0b8c6c4d91ee094e49f7fdac09a604141", []},
+  "quantum": {:hex, :quantum, "1.7.0", "22c6653bca3e5ec9ce5c574a0cfc5018e5cddc40c87a5950bd9d456762a947bf", [:mix], [], "hexpm"}}

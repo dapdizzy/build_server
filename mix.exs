@@ -7,7 +7,9 @@ defmodule BuildServer.Mixfile do
      elixir: "~> 1.2",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
-     deps: deps]
+     deps: deps,
+     escript: escript
+    ]
   end
 
   # Configuration for the OTP application
@@ -16,6 +18,10 @@ defmodule BuildServer.Mixfile do
   def application do
     [applications: [:logger, :quantum],
      mod: {BuildServer, []}]
+  end
+
+  defp escript do
+    [main_module: CLI]
   end
 
   # Dependencies can be Hex packages:
@@ -28,6 +34,6 @@ defmodule BuildServer.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-     [{:quantum, ">= 1.7.0"}]
+     [{:quantum, ">= 1.7.0"}, {:my_logger, github: "dapdizzy/my_logger"}]
   end
 end

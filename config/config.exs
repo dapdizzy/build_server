@@ -33,109 +33,45 @@ config :quantum,
 
 config :build_server,
 home_dir: "C:/Users/pyatkov/build_server_w_localtime",
-scripts_dir: "C:/AX/BuildScripts",
-systems: [Lips, Wax, Fax],
+scripts_dir: "C:/Ax/Build/Scripts",
+systems: [WaxR3],
 build_configuration:
   %{
-    Fax:
+    WaxR3:
       %{
-        "VCSFilePath" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/FAX/Definition/VCSDef.xml",
-        "ApplicationSourceDir" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/FAX",
-        "DropLocation" => "C:/AX/Build/Drop/Fax",
+        "VCSFilePath" => "C:/Program Files/Microsoft Dynamics AX/60/Server/Microsoft Dynamics AX/bin/Application/WAXR3/Definition/VCSDef.xml",
+        "ApplicationSourceDir" => "C:/Program Files/Microsoft Dynamics AX/60/Server/Microsoft Dynamics AX/bin/Application/WAXR3",
+        "DropLocation" => "C:/Ax/Build/Drop/WaxR3",
         "CompileAll" => "true",
         "CleanupAfterBuild" => "true",
         "CompileCIL" => "true",
         "TFSIntegration" => "true",
         "TFSUrl" => "https://mediamarkt.visualstudio.com/defaultcollection",
-        "TFSLabelPrefix" => "FAX-{0}",
-        "TFSWorkspace" => "$/FAX/FAX",
-        "LabelComments" => "FAX Build-{0}",
+        "TFSLabelPrefix" => "WAXR3-{0}",
+        "TFSWorkspace" => "$/WAXR3/WAXR3",
+        "LabelComments" => "WAX R3 Build-{0}",
         "MsBuildDir" => "C:/Program Files (x86)/MSBuild/12.0/Bin",
         "NoCleanOnError" => "true",
-        "BackupModelStoreFolder" => "C:/AX/Backup/Modelstore",
-        "CleanBackupFileName" => "C:/Program Files/Microsoft SQL Server/MSSQL12.MSSQLSERVER/MSSQL/Backup/AXR3.bak"
-      },
-    Wax:
-      %{
-        "VCSFilePath" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/WAX/Definition/VCSDef.xml",
-        "ApplicationSourceDir" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/WAX",
-        "DropLocation" => "C:/AX/Build/Drop/Wax",
-        "CompileAll" => "true",
-        "CleanupAfterBuild" => "true",
-        "CompileCIL" => "true",
-        "TFSIntegration" => "true",
-        "TFSUrl" => "https://mediamarkt.visualstudio.com/defaultcollection",
-        "TFSLabelPrefix" => "WAX-{0}",
-        "TFSWorkspace" => "$/WAX/FAX",
-        "LabelComments" => "WAX Build-{0}",
-        "MsBuildDir" => "C:/Program Files (x86)/MSBuild/12.0/Bin",
-        "NoCleanOnError" => "true",
-        "BackupModelStoreFolder" => "C:/AX/Backup/Modelstore",
-        "CleanBackupFileName" => "C:/Program Files/Microsoft SQL Server/MSSQL12.MSSQLSERVER/MSSQL/Backup/AXR3.bak"
-      },
-    Lips:
-      %{
-        "VCSFilePath" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/LIPS/Definition/VCSDef.xml",
-        "ApplicationSourceDir" => "C:/Program Files/Microsoft Dynamics AX/60/Server/AXTest/bin/Application/LIPS",
-        "DropLocation" => "C:/AX/Build/Drop/Lips",
-        "CompileAll" => "true",
-        "CleanupAfterBuild" => "true",
-        "CompileCIL" => "true",
-        "TFSIntegration" => "true",
-        "TFSUrl" => "https://mediamarkt.visualstudio.com/defaultcollection",
-        "TFSLabelPrefix" => "LIPS-{0}",
-        "TFSWorkspace" => "$/LIPS/LIPS",
-        "LabelComments" => "LIPS Build-{0}",
-        "MsBuildDir" => "C:/Program Files (x86)/MSBuild/12.0/Bin",
-        "NoCleanOnError" => "true",
-        "BackupModelStoreFolder" => "C:/AX/Backup/Modelstore",
-        "CleanBackupFileName" => "C:/Program Files/Microsoft SQL Server/MSSQL12.MSSQLSERVER/MSSQL/Backup/AXR3.bak"
+        "BackupModelStoreFolder" => "C:/Ax/Build/Backup/Modelstore",
+        "CleanBackupFileName" => "C:/Program Files/Microsoft SQL Server/MSSQL12.MSSQLSERVER/MSSQL/Backup/MicrosoftDynamicsAX.bak"
       }
   },
 deploy_configuration:
   %{
-    Lips:
+    WaxR3:
       %{
-        "BuildLocation" => "//MOW04DEV014/Drop/Lips",
+        "BuildLocation" => "//MOW04WAXBLD01/Ax/Build/Drop/WaxR3",
         "MsBuildDir" => "C:/Program Files/(x86)/MSBuild/12.0/Bin",
         "CompileAll" => true,
         "CompileCil" => true,
         "UninstallOnly" => false,
         "TFSIntegration" => true,
         "TFSURL" => "https://mediamarkt.visualstudio.com/defaultcollection",
-        "TFSWorkspace" => "$LIPS/LIPS",
+        "TFSWorkspace" => "$WAXR3/WAXR3",
         "NoCleanOnError" => true,
         "InstallModelStore" => true,
         "SystemName" => "LIPS"
-        },
-    Fax:
-      %{
-        "BuildLocation" => "//MOW04DEV014/Drop/Fax",
-        "MsBuildDir" => "C:/Program Files/(x86)/MSBuild/12.0/Bin",
-        "CompileAll" => true,
-        "CompileCil" => true,
-        "UninstallOnly" => false,
-        "TFSIntegration" => true,
-        "TFSURL" => "https://mediamarkt.visualstudio.com/defaultcollection",
-        "TFSWorkspace" => "$FAX/FAX",
-        "NoCleanOnError" => true,
-        "InstallModelStore" => true,
-        "SystemName" => "FAX"
-        },
-      Wax:
-        %{
-          "BuildLocation" => "//MOW04DEV014/Drop/Wax",
-          "MsBuildDir" => "C:/Program Files/(x86)/MSBuild/12.0/Bin",
-          "CompileAll" => true,
-          "CompileCil" => true,
-          "UninstallOnly" => false,
-          "TFSIntegration" => true,
-          "TFSURL" => "https://mediamarkt.visualstudio.com/defaultcollection",
-          "TFSWorkspace" => "$WAX/WAX",
-          "NoCleanOnError" => true,
-          "InstallModelStore" => true,
-          "SystemName" => "WAX"
-          }
+        }
     },
     commands:
       %{
