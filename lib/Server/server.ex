@@ -50,6 +50,10 @@ defmodule BuildServer.Server do
   #   {:reply, contains_value(systems, system), systems}
   # end
 
+  def handle_call(:get_scripts_share, _from, state) do
+    {:reply, Application.get_env(:build_server, :scripts_share, nil), state}
+  end
+
   def handle_call({:get_configuration, system}, _from, %ServerState{deploy_configuration: deploy_configuration} = state) do
     {:reply, do_get_configuration(system, deploy_configuration), state}
   end
@@ -223,8 +227,8 @@ defmodule BuildServer.Server do
     %ServerState{build_configuration: build_configuration} = state
   ) do
     # Merge client_configuration into the server one and do all the job in a separate linked process
-    spawn_link __MODULE__, :get_build_info!, [build_configuration |> Map.merge(client_configuration), client_node]
-    {:ok, state}
+    spawn_link __MODULE__, :get_build_info!, [build_configuration |> Map.merge(client_configuration), system, client_node]
+    {:reply, :ok, state}
   end
 
   def handle_call({:build, system, {_process, client_node} = build_client, options}, _from,
