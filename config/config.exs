@@ -35,6 +35,7 @@ config :build_server,
 home_dir: ~S"C:\AX\Build\WAXR3\build_server",
 scripts_dir: ~S"C:\AX\Build\WAXR3\build_scripts",
 scripts_share: ~S"\\MOW04DEV014\build_scripts",
+scripts_share: ~S"\\MOW04WAXBLD01\Ax\Build\Scripts",
 systems: [WaxR3],
 build_configuration:
   %{

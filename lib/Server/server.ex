@@ -80,7 +80,6 @@ defmodule BuildServer.Server do
         %DynamicState
         {
           quantum_schedule: quantum_schedule,
-          clients: _clients, 
           client_schedule: %{} = client_schedule
         } = dynamic_state
     } = state) do
