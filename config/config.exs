@@ -32,8 +32,9 @@ config :quantum,
   timezone: :local
 
 config :build_server,
-home_dir: "C:/Users/pyatkov/build_server_w_localtime",
-scripts_dir: "C:/Ax/Build/Scripts",
+home_dir: ~S"C:\AX\Build\WAXR3\build_server",
+scripts_dir: ~S"C:\AX\Build\WAXR3\build_scripts",
+scripts_share: ~S"\\MOW04DEV014\build_scripts",
 systems: [WaxR3],
 build_configuration:
   %{
@@ -56,11 +57,11 @@ build_configuration:
         "CleanBackupFileName" => "C:/Program Files/Microsoft SQL Server/MSSQL12.MSSQLSERVER/MSSQL/Backup/MicrosoftDynamicsAX.bak"
       }
   },
-deploy_configuration:
+deploy_configuration: 
   %{
     WaxR3:
       %{
-        "BuildLocation" => "//MOW04WAXBLD01/Ax/Build/Drop/WaxR3",
+        "BuildLocation" => ~S"\\MOW04DEV014\Drop\WaxR3",
         "MsBuildDir" => "C:/Program Files/(x86)/MSBuild/12.0/Bin",
         "CompileAll" => true,
         "CompileCil" => true,
@@ -70,7 +71,7 @@ deploy_configuration:
         "TFSWorkspace" => "$WAXR3/WAXR3",
         "NoCleanOnError" => true,
         "InstallModelStore" => true,
-        "SystemName" => "LIPS"
+        "SystemName" => "WAXR3"
         }
     },
     commands:
