@@ -116,7 +116,7 @@ defmodule BuildServer.Server do
         client_schedule_list = client_schedule |> Map.get(client_host, [])
         new_dynamic_state = %{dynamic_state |
           quantum_schedule: [job|quantum_schedule],
-          client_schedule: client_schedule |> Nao.put(client_host, [%ScheduleEntry{command: command, schedule: schedule}])}
+          client_schedule: client_schedule |> Map.put(client_host, [%ScheduleEntry{command: command, schedule: schedule}])}
         new_dynamic_state |> save_dynamic_server_state
         new_state = %{state | dynamic_state: new_dynamic_state}
         {:reply, :ok, new_state}
